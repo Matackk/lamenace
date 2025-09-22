@@ -1,29 +1,24 @@
-# Dockerfile — robust persistence & clean runtime
+# Python 3.12 slim image
 FROM python:3.12-slim
-
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl tini \
- && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
+# System deps (optional but useful)
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+    curl ca-certificates tini && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy app files
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source
 COPY bot.py ./
-# Seed an initial pickle (will be copied to /data at runtime if not present)
+# seed pickle (will be copied to /data at runtime if not present there)
 COPY bot_state.pickle ./
 
-ENV PYTHONUNBUFFERED=1 \
-    PORT=8080 \
-    KEEPALIVE=1 \
-    PERSIST_PATH=/data/bot_state.pickle
+# Optional banner if you add it to the repo
+# COPY start_banner.jpg ./
 
-# Prepare data dir
-RUN mkdir -p /data
-
+# Entrypoint: ensure /data has a seed pickle, then run bot
 ENTRYPOINT ["/usr/bin/tini", "--"]
-
-# At start: if /data/bot_state.pickle missing, copy the seeded one; then launch
-CMD ["/bin/sh","-lc","[ -f /data/bot_state.pickle ] || cp -n /app/bot_state.pickle /data/bot_state.pickle; python bot.py"]
+CMD ["/bin/sh", "-lc", "[ -f /data/bot_state.pickle ] || cp -n /app/bot_state.pickle /data/bot_state.pickle; python bot.py"]
