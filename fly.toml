@@ -1,0 +1,31 @@
+# fly.toml — single-process app with persistent volume mount
+app = "beta-test-frenchtrencher"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  KEEPALIVE = "1"
+  PORT = "8080"
+
+[mounts]
+  source = "bot_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 20
+    hard_limit = 25
+
+  [[http_service.http_checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "5s"
+    method = "GET"
+    path = "/"
+    protocol = "http"
+    tls_skip_verify = false

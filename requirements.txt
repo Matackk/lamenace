@@ -1,0 +1,3 @@
+# Requirements for La Menace Telegram Bot
+# IMPORTANT: do NOT add the third-party package named 'telegram' (it conflicts with python-telegram-bot)
+python-telegram-bot==21.*
