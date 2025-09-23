@@ -23,7 +23,3 @@ primary_region = "cdg"
     grace_period = "5s"
     method = "GET"
     path = "/"
-
-[mounts]
-  source = "bot_data"
-  destination = "/data"
