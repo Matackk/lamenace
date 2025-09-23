@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# La Menace — Telegram Bot (Fly-ready, always-on keepalive, PicklePersistence)
 # python-telegram-bot >= 21 (async, Application.run_polling)
+# PicklePersistence (bot_state.pickle or /data/bot_state.pickle)
 # Env vars: BOT_TOKEN, ADMIN_CHAT_ID, AFFILIATE_URL, MINIAPP_URL, ADVANTAGES_URL
-# Optional: START_IMAGE_URL, START_IMAGE_PATH, PERSIST_PATH
+# Optional: START_IMAGE_URL, START_IMAGE_PATH, KEEPALIVE, PERSIST_PATH
 
 from __future__ import annotations
 
@@ -37,8 +37,8 @@ def _parse_int(s: str) -> int:
 
 BOT_TOKEN: Final[str] = os.environ.get('BOT_TOKEN', '').strip()
 AFFILIATE_URL: Final[str] = os.environ.get('AFFILIATE_URL', '').strip()
-MINIAPP_URL: Final[str] = os.environ.get('MINIAPP_URL', 'https://darkred-mantis-906245.hostingersite.com').strip()
-ADVANTAGES_URL: Final[str] = os.environ.get('ADVANTAGES_URL', 'https://mediumaquamarine-crab-726883.hostingersite.com').strip()
+MINIAPP_URL: Final[str] = os.environ.get('MINIAPP_URL', 'https://dancing-cranachan-2a5c4f.netlify.app/').strip()
+ADVANTAGES_URL: Final[str] = os.environ.get('ADVANTAGES_URL', 'https://68d0924dcceed8be4249a475--stakevpnbottiktok.netlify.app/').strip()
 ADMIN_CHAT_ID: Final[int] = _parse_int(os.environ.get('ADMIN_CHAT_ID', '').strip())
 
 # Optional start image
@@ -62,7 +62,7 @@ CB_EDIT_INFO = 'edit_info'
 CB_OPEN_MENU = 'open_menu'
 CB_START_FLOW = 'start_flow'
 CB_REPLY_PREFIX = 'reply_to:'  # helpdesk: admin reply target
-CB_END_REPLY = 'end_reply'     # end current reply thread
+CB_END_REPLY = 'end_reply'  # end current reply thread
 
 # Keys used in user_data
 KEY_OFFER = 'offer'              # 'beginner' | 'pro'
@@ -182,7 +182,7 @@ async def notify_admin(context: ContextTypes.DEFAULT_TYPE, user: Optional[User],
 # -------------------------- Images / UI helpers --------------------------
 
 async def send_start_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send the startup banner image (no buttons).\"""
+    """Send the startup banner image (no buttons)."""
     chat_id = update.effective_chat.id if update.effective_chat else None
     if not chat_id:
         return
@@ -197,7 +197,7 @@ async def send_start_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         logging.warning('Failed to send start image: %s', e)
 
 async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send the main menu: image + three buttons.\"""
+    """Send the main menu: image + three buttons."""
     chat_id = update.effective_chat.id if update.effective_chat else None
     if not chat_id:
         return
@@ -209,13 +209,8 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if START_IMAGE_URL:
             await context.bot.send_photo(chat_id=chat_id, photo=START_IMAGE_URL, reply_markup=main_menu_kb())
             return
-        # Fallback: no image available (must be non-empty text)
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text='🏠 <b>Menu principal</b>',
-            parse_mode=ParseMode.HTML,
-            reply_markup=main_menu_kb(),
-        )
+        # Fallback: no image available
+        await context.bot.send_message(chat_id=chat_id, text=' ', reply_markup=main_menu_kb())
     except Exception as e:
         logging.warning('Failed to send main menu: %s', e)
 
@@ -591,9 +586,10 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await open_menu_cb(update, context)
     return ConversationHandler.END
 
-# -------------------------- Keepalive (ALWAYS ON) --------------------------
+# -------------------------- Keepalive (optional) --------------------------
+# Some hosts (ex: Replit) sleep on inactivity. Enable a tiny HTTP server with KEEPALIVE=1.
 
-def _keepalive_server(port: int) -> None:
+def _keepalive_server(port: int = int(os.environ.get('PORT', '8000'))) -> None:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):  # noqa: N802
             self.send_response(200)
@@ -603,20 +599,15 @@ def _keepalive_server(port: int) -> None:
         def log_message(self, *args, **kwargs):  # silence
             return
     try:
-        httpd = HTTPServer(('0.0.0.0', port), Handler)
+        httpd = HTTPServer(('', port), Handler)
         httpd.serve_forever()
     except Exception as e:
         logging.warning('Keepalive server error: %s', e)
 
-def start_keepalive_always() -> None:
-    # Always start a small HTTP server; default PORT=8080 if not provided
-    try:
-        port = int(os.environ.get('PORT') or '8080')
-    except Exception:
-        port = 8080
-    t = threading.Thread(target=_keepalive_server, args=(port,), daemon=True)
-    t.start()
-    logging.info('Keepalive HTTP server started on 0.0.0.0:%s', port)
+def start_keepalive_if_needed() -> None:
+    if os.environ.get('KEEPALIVE', '0') == '1':
+        t = threading.Thread(target=_keepalive_server, daemon=True)
+        t.start()
 
 # -------------------------- Application --------------------------
 
@@ -695,9 +686,7 @@ def main() -> None:
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO,
     )
-    # Always-on keepalive
-    start_keepalive_always()
-
+    start_keepalive_if_needed()
     app = build_application()
     logging.info('Bot starting…')
     app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
